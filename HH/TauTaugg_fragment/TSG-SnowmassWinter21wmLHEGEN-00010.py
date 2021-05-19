@@ -1,7 +1,17 @@
-import FWCore.ParameterSet.Config as cms
-from Configuration.Generator.Pythia8CommonSettings_cfi import *
-from Configuration.Generator.MCTunes2017.PythiaCP5Settings_cfi import *
 from Configuration.Generator.Pythia8PowhegEmissionVetoSettings_cfi import *
+from Configuration.Generator.MCTunes2017.PythiaCP5Settings_cfi import *
+from Configuration.Generator.Pythia8CommonSettings_cfi import *
+import FWCore.ParameterSet.Config as cms
+
+externalLHEProducer = cms.EDProducer("ExternalLHEProducer",
+	args = cms.vstring('/cvmfs/cms.cern.ch/phys_generator/gridpacks/slc7_amd64_gcc700/14TeV/powheg/V2/ggHH_EWChL_NLO_14TeV_POWHEG/ggHH_EWChL_slc7_amd64_gcc700_CMSSW_10_6_0_my_ggHH_EWChL_NLO_cHHH_0.tgz'),
+	nEvents = cms.untracked.uint32(5000),
+    numberOfParameters = cms.uint32(1),
+    outputFile = cms.string('cmsgrid_final.lhe'),
+    scriptName=cms.FileInPath(
+        'GeneratorInterface/LHEInterface/data/run_generic_tarball_cvmfs.sh')
+)
+
 
 generator = cms.EDFilter("Pythia8HadronizerFilter",
                          maxEventsToPrint=cms.untracked.int32(1),
@@ -14,9 +24,10 @@ generator = cms.EDFilter("Pythia8HadronizerFilter",
                              pythia8CP5SettingsBlock,
                              pythia8PowhegEmissionVetoSettingsBlock,
                              processParameters=cms.vstring(
+
                                  'POWHEG:nFinal = 2',  # Number of final state particles
-                                 ## (BEFORE THE DECAYS) in the LHE
-                                 ## other than emitted extra parton
+                                 # (BEFORE THE DECAYS) in the LHE
+                                 # other than emitted extra parton
                                  '25:m0 = 125.0',
                                  '25:onMode = off',
                                  '25:onIfMatch = 15 -15',
@@ -27,13 +38,15 @@ generator = cms.EDFilter("Pythia8HadronizerFilter",
                                  # list of mothers not specified -> count all particles in hard process+resonance decays (better to avoid specifying mothers when including leptons from the lhe in counting, since intermediate resonances are not gauranteed to appear in general
                                  'ResonanceDecayFilter:mothers = 25',
                                  'ResonanceDecayFilter:daughters = 15,15,22,22'
+
                              ),
-                             parameterSets=cms.vstring('pythia8CommonSettings',
-                                                       'pythia8CP5Settings',
-                                                       'pythia8PowhegEmissionVetoSettings',
-                                                       'processParameters'
-                                                       )
+                             parameterSets=cms.vstring(
+                                 'pythia8CommonSettings',
+                                 'pythia8CP5Settings',
+                                 'pythia8PowhegEmissionVetoSettings',
+                                 'processParameters'
+                             )
                          )
-                         )
+)
 
 ProductionFilterSequence = cms.Sequence(generator)
