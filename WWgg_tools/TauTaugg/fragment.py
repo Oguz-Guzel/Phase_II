@@ -103,12 +103,12 @@ process.generator = cms.EDFilter("Pythia8HadronizerFilter",
                                      processParameters=cms.vstring(
                                          '25:m0 = 125.0',
                                          '25:onMode = off',
-                                         '25:onIfMatch = 5 -5',
+                                         '25:onIfMatch = 15 -15',
                                          '25:onIfMatch = 22 22',
                                          'ResonanceDecayFilter:filter = on',
                                          'ResonanceDecayFilter:exclusive = on',
                                          'ResonanceDecayFilter:mothers = 25',
-                                         'ResonanceDecayFilter:daughters = 5,5,22,22'
+                                         'ResonanceDecayFilter:daughters = 15,15,22,22'
                                      ),
                                      pythia8CP5Settings=cms.vstring(
                                          'Tune:pp 14',
