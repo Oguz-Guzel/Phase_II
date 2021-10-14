@@ -185,12 +185,15 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
 def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCounters=lambda f: -1., eras=("all", None), verbose=False):
     """
     Print yields to the log file, and write a LaTeX yields table for each
+
     Samples can be grouped (only for the LaTeX table) by specifying the
     ``yields-group`` key (overriding the regular ``groups`` used for plots).
     The sample (or group) name to use in this table should be specified
     through the ``yields-title`` sample key.
+
     In addition, the following options in the ``plotIt`` section of
     the YAML configuration file influence the layout of the LaTeX yields table:
+
     - ``yields-table-stretch``: ``\\arraystretch`` value, 1.15 by default
     - ``yields-table-align``: orientation, ``h`` (default), samples in rows, or ``v``, samples in columns
     - ``yields-table-text-align``: alignment of text in table cells (default: ``c``)
