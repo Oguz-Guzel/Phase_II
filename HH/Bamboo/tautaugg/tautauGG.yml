@@ -6,48 +6,47 @@ samples:
   GluGluToHHTo2G2Tau_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_200PU:  
     era: HL-LHC
     type: signal
-    files: GluGluToHHTo2G2Tau_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_200PU.txt
-    generated-events: sumgenweight
-    cross-section: 1000 #xs * 1000
-    legend: 'HH \rightarrow TauTau#gamma#gamma *1000 '
+    files:
+      - /afs/cern.ch/work/a/aguzel/private/bamboodev/GluGluToHHTo2G2Tau_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_ntuple_0_0.root
+    generated-events: nEvents
+    cross-section: 1
+    legend: '$ HH \rightarrow \tau\tau\gamma\gamma $'
     line-color: "#260AB3" #blue
   GJet_Pt-20toInf_DoubleEMEnriched_MGG-40to80_TuneCUEP8M2T4_14TeV_pythia8_200PU:
     era: HL-LHC
     type: mc
     files: GJet_Pt-20toInf_DoubleEMEnriched_MGG-40to80_TuneCUEP8M2T4_14TeV_pythia8_200PU.txt    
-    generated-events: sumgenweight
+    generated-events: nEvents
     cross-section: 998.1 
-    legend: '#gamma+jet'
+    legend: '$ \gamma + jet $'
     fill-color: "#c7e619"
     order: 2
   QCD_Pt-30toInf_DoubleEMEnriched_MGG-40to80_TuneCUEP8M2T4_14TeV_Pythia8_200PU:
-    group: QCD
     era: HL-LHC
     type: mc
     files: QCD_Pt-30toInf_DoubleEMEnriched_MGG-40to80_TuneCUEP8M2T4_14TeV_Pythia8_200PU.txt
-    generated-events: sumgenweight
-    cross-section: 162060
-    legend: 'QCD / 1000'
+    generated-events: nEvents
+    cross-section: 162060000
+    legend: '$ QCD $'
     fill-color: "#28E298"
     order: 3
   WGToLNuG_PtG-40_TuneCUETP8M1_14TeV-madgraphMLM-pythia8_200PU:
-    group: WGtoLNuG
     era: HL-LHC
     type: mc
-    files: WGToLNuG_PtG-40_TuneCUETP8M1_14TeV-madgraphMLM-pythia8_200PU.txt
-    generated-events: sumgenweight
-    cross-section: 18790 #xs * 1000
-    legend: 'WG \rightarrow L#nu #gamma *1000'
+    files: 
+      - /afs/cern.ch/work/a/aguzel/private/bamboodev/WGToLNuG_PtG-40_TuneCUETP8M1_14TeV-madgraphMLM-pythia8_ntuple_0_0.root
+    generated-events: nEvents
+    cross-section: 18.79 #
+    legend: '$ WG \rightarrow L\nu\gamma $'
     fill-color: "#40D51A"
     order: 4
   ZGTo2LG_TuneCUETP8M1_14TeV-amcatnloFXFX-pythia8_200PU:
-    group: ZGTo2LG
     era: HL-LHC
     type: mc
     files: ZGTo2LG_TuneCUETP8M1_14TeV-amcatnloFXFX-pythia8_200PU.txt
-    generated-events: sumgenweight
-    cross-section: 14500 #xs * 100
-    legend: 'ZG \rightarrow 2L #gamma *100'
+    generated-events: nEvents
+    cross-section: 145
+    legend: '$ ZG \rightarrow 2L \gamma $'
     fill-color: "#28CCE2" # lightpurple #CHANGETHECOLOR
     order: 5   
 plotIt:
