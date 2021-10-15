@@ -4,43 +4,38 @@ import os.path
 from bamboo.analysismodules import AnalysisModule, HistogramsModule
 
 
-class CMSPhase2SimRTBModule(AnalysisModule):
+class CMSPhase2SimModule(AnalysisModule):
     """ Base module for processing Phase2 flat trees """
 
     def __init__(self, args):
-        super(CMSPhase2SimRTBModule, self).__init__(args)
-        self._h_genwcount = {}
+        super(CMSPhase2SimModule, self).__init__(args)
 
     def prepareTree(self, tree, sample=None, sampleCfg=None):
         from bamboo.treedecorators import decorateCMSPhase2SimTree
         from bamboo.dataframebackend import DataframeBackend
         t = decorateCMSPhase2SimTree(tree, isMC=True)
         be, noSel = DataframeBackend.create(t)
-        from bamboo.root import gbl
-        self._h_genwcount[sample] = be.rootDF.Histo1D(
-            gbl.ROOT.RDF.TH1DModel("h_count_genweight",
-                                   "genweight sum", 1, 0., 1.),
-            "_zero_for_stats",
-            "genweight"
-        )
         return t, noSel, be, tuple()
 
     def mergeCounters(self, outF, infileNames, sample=None):
+        from bamboo.root import gbl
         outF.cd()
-        self._h_genwcount[sample].Write("h_count_genweight")
+        hNEvts = gbl.TH1F("nEvents", "Number of events", 1, 0., 1.)
+        for fn in infileNames:
+            f = gbl.TFile.Open(fn)
+            tup = f.Get("myana/mytree")  # FIXME
+            if not tup:
+                raise RuntimeError(
+                    "File {0} does not have a tree {1}".format(fn, self.args.treeName))
+            hNEvts.Fill(0, tup.GetEntries())
+        outF.cd()
+        hNEvts.Write("nEvents")
 
     def readCounters(self, resultsFile):
-        return {"sumgenweight": resultsFile.Get("h_count_genweight").GetBinContent(1)}
-
-
-class CMSPhase2SimRTBHistoModule(CMSPhase2SimRTBModule, HistogramsModule):
-    """ Base module for producing plots from Phase2 flat trees """
-
-    def __init__(self, args):
-        super(CMSPhase2SimRTBHistoModule, self).__init__(args)
+        hNEvts = resultsFile.Get("nEvents")
+        return {"nEvents": hNEvts.GetBinContent(1)}
 
 ## BEGIN cutflow reports, adapted from bamboo.analysisutils
-
 
 logger = logging.getLogger(__name__)
 
@@ -120,32 +115,6 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
                 sel_eff[i] = str(f"({sel_eff[i]:.2f}\%)")
             entries_smp.append(sel_eff)
             sel_list.append(colEntries_forEff)
-        from bamboo.root import gbl
-        sel_list_array = np.array(sel_list)
-        gbl.gStyle.SetPalette(1)
-        c1 = gbl.TCanvas("c1", "c1", 600, 400)
-        cutflow_histo_FS = gbl.TH1F(
-            "cutflow_histo", "Selection Cutflow", 6, 0, 6)
-        cutflow_histo_FS.GetXaxis().SetTitle("Selection")
-        cutflow_histo_FS.GetYaxis().SetTitle("Nevent")
-        cutflow_histo_Delphes = gbl.TH1F("cutflow_histo", "Delphes", 6, 0, 6)
-        for i in range(len(colEntries_forEff)):
-            cutflow_histo_FS.Fill(i, float(sel_list_array[0, i]))
-        cutflow_histo_FS.SetLineColor(2)
-        cutflow_histo_FS.SetLineWidth(3)
-        for i in range(len(colEntries_forEff)):
-            cutflow_histo_Delphes.Fill(i, float(sel_list_array[1, i]))
-        cutflow_histo_Delphes.SetLineColor(4)
-        cutflow_histo_Delphes.SetLineWidth(3)
-        cutflow_histo_FS.Draw("HIST")
-        cutflow_histo_Delphes.Draw("SAME HIST")
-        gbl.gPad.SetLogy()
-        leg = gbl.TLegend(0.78, 0.695, 0.980, 0.935)
-        leg.AddEntry(cutflow_histo_Delphes, "Delphes", "l")
-        leg.AddEntry(cutflow_histo_FS, "FS", "l")
-        leg.Draw()
-        c1.SaveAs("cutflow.gif")
-        logger.info("Plot for selection cutflow is available")
     if smp_data:
         sepStr_v += f"|{align}|"
         hdrs.append("Data")
@@ -185,15 +154,12 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
 def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCounters=lambda f: -1., eras=("all", None), verbose=False):
     """
     Print yields to the log file, and write a LaTeX yields table for each
-
     Samples can be grouped (only for the LaTeX table) by specifying the
     ``yields-group`` key (overriding the regular ``groups`` used for plots).
     The sample (or group) name to use in this table should be specified
     through the ``yields-title`` sample key.
-
     In addition, the following options in the ``plotIt`` section of
     the YAML configuration file influence the layout of the LaTeX yields table:
-
     - ``yields-table-stretch``: ``\\arraystretch`` value, 1.15 by default
     - ``yields-table-align``: orientation, ``h`` (default), samples in rows, or ``v``, samples in columns
     - ``yields-table-text-align``: alignment of text in table cells (default: ``c``)
@@ -290,11 +256,42 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
 
 ## END cutflow reports, adapted from bamboo.analysisutils
 
+
+class CMSPhase2SimHistoModule(CMSPhase2SimModule, HistogramsModule):
+    """ Base module for producing plots from Phase2 flat trees """
+
+    def __init__(self, args):
+        super(CMSPhase2SimHistoModule, self).__init__(args)
+
+    def postProcess(self, taskList, config=None, workdir=None, resultsdir=None):
+        """ Customised cutflow reports and plots """
+        if not self.plotList:
+            self.plotList = self.getPlotList(resultsdir=resultsdir)
+        from bamboo.plots import Plot, DerivedPlot, CutFlowReport
+        plotList_cutflowreport = [
+            ap for ap in self.plotList if isinstance(ap, CutFlowReport)]
+        plotList_plotIt = [ap for ap in self.plotList if (isinstance(
+            ap, Plot) or isinstance(ap, DerivedPlot)) and len(ap.binnings) == 1]
+        eraMode, eras = self.args.eras
+        if eras is None:
+            eras = list(config["eras"].keys())
+        if plotList_cutflowreport:
+            printCutFlowReports(config, plotList_cutflowreport, workdir=workdir, resultsdir=resultsdir,
+                                readCounters=self.readCounters, eras=(eraMode, eras), verbose=self.args.verbose)
+        if plotList_plotIt:
+            from bamboo.analysisutils import writePlotIt, runPlotIt
+            cfgName = os.path.join(workdir, "plots.yml")
+            writePlotIt(config, plotList_plotIt, cfgName, eras=eras, workdir=workdir, resultsdir=resultsdir,
+                        readCounters=self.readCounters, vetoFileAttributes=self.__class__.CustomSampleAttributes, plotDefaults=self.plotDefaults)
+            runPlotIt(cfgName, workdir=workdir, plotIt=self.args.plotIt,
+                      eras=(eraMode, eras), verbose=self.args.verbose)
+
 ################################
-## An analysis module example ##
+  ## Actual analysis module ##
 ################################
 
-class CMSPhase2SimTest(CMSPhase2SimRTBHistoModule):
+
+class CMSPhase2Sim(CMSPhase2SimHistoModule):
     def definePlots(self, t, noSel, sample=None, sampleCfg=None):
         from bamboo.plots import Plot, CutFlowReport
         from bamboo.plots import EquidistantBinning as EqB
@@ -416,10 +413,12 @@ class CMSPhase2SimTest(CMSPhase2SimRTBHistoModule):
         
 
        #yields
-        yields = CutFlowReport("yields")
-        plots.append(yields)
-        yields.add(noSel, title= 'noSel')
-        yields.add(sel1, title='sel1')
-        yields.add(sel2, title='sel2')
+        cfr = CutFlowReport("yields")
+        
+        cfr.add(noSel, "Sel0: No selection")
+        cfr.add(sel1, "Sel1: Two Photons")
+        cfr.add(sel2, "Sel2: Two Taus")
+        
+        plots.append(cfr)
 
         return plots
