@@ -4,36 +4,33 @@ import os.path
 from bamboo.analysismodules import AnalysisModule, HistogramsModule
 
 
-class CMSPhase2SimModule(AnalysisModule):
+class CMSPhase2SimRTBModule(AnalysisModule):
     """ Base module for processing Phase2 flat trees """
 
     def __init__(self, args):
-        super(CMSPhase2SimModule, self).__init__(args)
+        super(CMSPhase2SimRTBModule, self).__init__(args)
+        self._h_genwcount = {}
 
     def prepareTree(self, tree, sample=None, sampleCfg=None):
         from bamboo.treedecorators import decorateCMSPhase2SimTree
         from bamboo.dataframebackend import DataframeBackend
         t = decorateCMSPhase2SimTree(tree, isMC=True)
         be, noSel = DataframeBackend.create(t)
+        from bamboo.root import gbl
+        self._h_genwcount[sample] = be.rootDF.Histo1D(
+            gbl.ROOT.RDF.TH1DModel("h_count_genweight",
+                                   "genweight sum", 1, 0., 1.),
+            "_zero_for_stats",
+            "genweight"
+        )
         return t, noSel, be, tuple()
 
     def mergeCounters(self, outF, infileNames, sample=None):
-        from bamboo.root import gbl
         outF.cd()
-        hNEvts = gbl.TH1F("nEvents", "Number of events", 1, 0., 1.)
-        for fn in infileNames:
-            f = gbl.TFile.Open(fn)
-            tup = f.Get("myana/mytree")  # FIXME
-            if not tup:
-                raise RuntimeError(
-                    "File {0} does not have a tree {1}".format(fn, self.args.treeName))
-            hNEvts.Fill(0, tup.GetEntries())
-        outF.cd()
-        hNEvts.Write("nEvents")
+        self._h_genwcount[sample].Write("h_count_genweight")
 
     def readCounters(self, resultsFile):
-        hNEvts = resultsFile.Get("nEvents")
-        return {"nEvents": hNEvts.GetBinContent(1)}
+        return {"sumgenweight": resultsFile.Get("h_count_genweight").GetBinContent(1)}
 
 ## BEGIN cutflow reports, adapted from bamboo.analysisutils
 
@@ -257,7 +254,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
 ## END cutflow reports, adapted from bamboo.analysisutils
 
 
-class CMSPhase2SimHistoModule(CMSPhase2SimModule, HistogramsModule):
+class CMSPhase2SimHistoModule(CMSPhase2SimRTBModule, HistogramsModule):
     """ Base module for producing plots from Phase2 flat trees """
 
     def __init__(self, args):
@@ -395,7 +392,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             30, 0., 250.), title="SubLeading Photon pT"))
         
         plots.append(Plot.make1D("Inv_mass_ggSel1", mGG, sel1,
-                     EqB(50, 100., 150.), title="m_{\gamma\gamma}"))
+                     EqB(50, 0., 400.), title="m_{\gamma\gamma}"))
 
        #sel2
 
@@ -408,8 +405,6 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         plots.append(Plot.make1D("Inv_mass_ggSel2", mGG, sel2,
                      EqB(50, 100., 150.), title="m_{\gamma\gamma}"))
 
-        plots.append(Plot.make1D("Inv_mass_TauTauSel2", mTauTau, sel2,
-                     EqB(50, 100., 150.), title="m_{\tau\tau}"))
         
 
        #yields
