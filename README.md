@@ -1,3 +1,4 @@
-# Phase_II
+# Search for nonresonant Higgs Boson pair production in the WW&gamma; &gamma; channel at the HL-LHC
 
-Personal repo for Phase-II studies
+
+A respository for analysis scripts of Di-Higgs search.
