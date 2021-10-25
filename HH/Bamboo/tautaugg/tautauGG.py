@@ -32,7 +32,8 @@ class CMSPhase2SimRTBModule(AnalysisModule):
     def readCounters(self, resultsFile):
         return {"sumgenweight": resultsFile.Get("h_count_genweight").GetBinContent(1)}
 
-## BEGIN cutflow reports, adapted from bamboo.analysisutils
+# BEGIN cutflow reports, adapted from bamboo.analysisutils
+
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
     eraMode, eras = eras
     if not eras:  # from config if not specified
         eras = list(config["eras"].keys())
-    ## helper: print one bamboo.plots.CutFlowReport.Entry
+    # helper: print one bamboo.plots.CutFlowReport.Entry
 
     def printEntry(entry, printFun=logger.info, recursive=True, genEvents=None):
         effMsg = ""
@@ -183,7 +184,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
             for c in entry.children:
                 printEntry(c, printFun=printFun,
                            recursive=recursive, genEvents=genEvents)
-    ## retrieve results files, get generated events for each sample
+    # retrieve results files, get generated events for each sample
     from bamboo.root import gbl
     resultsFiles = dict()
     generated_events = dict()
@@ -215,13 +216,13 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
     for report in reportList:
         smpReports = {smp: report.readFromResults(
             resF) for smp, resF in resultsFiles.items()}
-        ## debug print
+        # debug print
         for smp, smpRep in smpReports.items():
             if smpRep.printInLog:
                 logger.info(f"Cutflow report {report.name} for sample {smp}")
                 for root in smpRep.rootEntries():
                     printEntry(root, genEvents=generated_events[smp])
-        ## save yields.tex (if needed)
+        # save yields.tex (if needed)
         if any(len(cb) > 1 or tt != cb[0] for tt, cb in report.titles.items()):
             if not has_plotit:
                 logger.error(
@@ -251,7 +252,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
                     logger.info("Yields table for era(s) {0} was written to {1}".format(
                         ",".join(eras), os.path.join(workdir, outName)))
 
-## END cutflow reports, adapted from bamboo.analysisutils
+# END cutflow reports, adapted from bamboo.analysisutils
 
 
 class CMSPhase2SimHistoModule(CMSPhase2SimRTBModule, HistogramsModule):
@@ -294,97 +295,144 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         from bamboo.plots import EquidistantBinning as EqB
         from bamboo import treefunctions as op
 
-        #count no of events here
+        # count no of events here
 
         noSel = noSel.refine("withgenweight", weight=t.genweight)
 
         plots = []
 
-        #select photons
-        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, op.NOT(op.in_range(1.442, op.abs(ph.eta), 1.566)), ph.pt > 25))
-        
-        #selection of loose ID photon
+        # select photons
+        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, op.NOT(
+            op.in_range(1.442, op.abs(ph.eta), 1.566)), ph.pt > 25))
+
+        # selection of loose ID photon
         looseIDPhotons = op.select(photons, lambda ph: ph.idpass & (1 << 0))
 
-        #sortIDphotons
+        # sortIDphotons
         sortedIDphotons = op.sort(looseIDPhotons, lambda ph: -ph.pt)
-        
+
         mgg = op.invariant_mass(sortedIDphotons[0].p4, sortedIDphotons[1].p4)
 
-        #selection: at least 2 photons with invariant mass within [100,150]
-        twoPhotonsSel = noSel.refine("hasInvMassPhPh", cut=op.rng_len(sortedIDphotons) >= 2 )
-        
+        # selection: at least 2 photons with invariant mass within [100,150]
+        twoPhotonsSel = noSel.refine(
+            "hasInvMassPhPh", cut=op.rng_len(sortedIDphotons) >= 2)
+
         # pT/InvM(gg) > 0.33 selection for leading photon
-        pTmggRatioLeading_sel = twoPhotonsSel.refine( "ptMggLeading", cut= op.product(sortedIDphotons[0].pt, op.pow(mgg, -1)) > 0.33 )
-        pTmggRatio_sel = pTmggRatioLeading_sel.refine("ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)
-        mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut = [mgg > 100])
-        
+        pTmggRatioLeading_sel = twoPhotonsSel.refine(
+            "ptMggLeading", cut=op.product(sortedIDphotons[0].pt, op.pow(mgg, -1)) > 0.33)
+        pTmggRatio_sel = pTmggRatioLeading_sel.refine(
+            "ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)
+        mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut=[mgg > 100])
+
         # electrons
 
-        electrons = op.select(t.elec, lambda el: op.AND(op.abs(el.eta) < 3, op.NOT(op.in_range(1.442, op.abs(el.eta), 1.566)), el.pt > 10.))
+        electrons = op.select(t.elec, lambda el: op.AND(op.abs(el.eta) < 3, op.NOT(
+            op.in_range(1.442, op.abs(el.eta), 1.566)), el.pt > 10.))
 
-        IDelectrons = op.select(electrons, lambda el: el.idpass & (1 << 0))  # loose ID
-        
+        IDelectrons = op.select(
+            electrons, lambda el: el.idpass & (1 << 0))  # loose ID
+
         cleanedElectrons = op.select(IDelectrons, lambda el: op.NOT(
             op.rng_any(sortedIDphotons, lambda ph: op.deltaR(el.p4, ph.p4) < 0.2)))
-        
+
         # muons
-        
-        muons = op.select(t.muon, lambda mu: op.AND(mu.pt > 10., op.abs(mu.eta) < 3))
+
+        muons = op.select(t.muon, lambda mu: op.AND(
+            mu.pt > 10., op.abs(mu.eta) < 3))
 
         isolatedMuons = op.select(muons, lambda mu: mu.isopass & (1 << 2))
-        
-        IDmuons = op.select(isolatedMuons, lambda mu: mu.idpass & (1 << 2)) # tight ID
-        
+
+        IDmuons = op.select(
+            isolatedMuons, lambda mu: mu.idpass & (1 << 0))  # loose ID
+
         cleanedMuons = op.select(IDmuons, lambda mu: op.NOT(
             op.rng_any(sortedIDphotons, lambda ph: op.deltaR(mu.p4, ph.p4) < 0.2)))
-        
+
         # taus
 
-        taus = op.select(t.tau, lambda tau: op.AND(tau.pt > 20., op.abs(tau.eta) < 3))
+        taus = op.select(t.tau, lambda tau: op.AND(
+            tau.pt > 20., op.abs(tau.eta) < 3))
 
         isolatedTaus = op.select(taus, lambda tau: tau.isopass & (1 << 2))
+
+        cleanedTaus = op.select(isolatedTaus, lambda tau: op.AND(
+            op.NOT(op.rng_any(sortedIDphotons,
+                   lambda ph: op.deltaR(tau.p4, ph.p4) < 0.2)),
+            op.NOT(op.rng_any(cleanedElectrons,
+                   lambda el: op.deltaR(tau.p4, el.p4) < 0.2)),
+            op.NOT(op.rng_any(cleanedMuons,
+                   lambda mu: op.deltaR(tau.p4, mu.p4) < 0.2))
+        ))
+
+        def nDaughters(gen):
+            """Return the number of daughters of a given object. """
+            return gen.d2() - gen.d1()
         
-        cleanedTaus = op.select(isolatedTaus, lambda tau: op.NOT(op.AND(op.rng_any(sortedIDphotons, lambda ph: op.deltaR(tau.p4, ph.p4) < 0.2),
-                                                                        op.rng_any(cleanedElectrons, lambda el: op.deltaR(tau.p4, el.p4) < 0.2),
-                                                                        op.rng_any(cleanedMuons, lambda mu: op.deltaR(tau.p4, mu.p4) < 0.2))))
+        genTaus = op.select(t.genpart, lambda g: op.abs(g.pid) == 15)
+        
+        def nDaughters(gen):
+            """Returns the number of daughters of a genparticle. """
+            return gen.d2() - gen.d1()
+        
+        oneGenTauSel = noSel.refine("onegentau", cut = [op.rng_len(genTaus) >= 1])
+        
 
-        # #select jets with pt>25 GeV end eta in the detector acceptance
-        # jets = op.select(t.jetpuppi, lambda jet: op.AND(
-        #     jet.pt > 30., op.abs(jet.eta) < 2.5))
+        # jets
 
-        # identifiedJets = op.select(jets, lambda j: j.idpass & (1 << 2))
-        # cleanedJets = op.select(identifiedJets, lambda j: op.AND(
-        #     op.NOT(op.rng_any(identifiedElectrons, lambda el: op.deltaR(
-        #         el.p4, j.p4) < 0.4)),  # identified or cleaned mu/e ?
-        #     op.NOT(op.rng_any(identifiedMuons,
-        #            lambda mu: op.deltaR(mu.p4, j.p4) < 0.4))
-        # ))
+        jets = op.select(t.jetpuppi, lambda jet: op.AND(
+            jet.pt > 30., op.abs(jet.eta) < 3))
+
+        IDJets = op.select(jets, lambda j: j.idpass & (1 << 2))  # tight ID
+
+        cleanedJets = op.select(IDJets, lambda j: op.AND(
+            op.NOT(op.rng_any(cleanedElectrons,
+                   lambda el: op.deltaR(j.p4, el.p4) < 0.4)),
+            op.NOT(op.rng_any(cleanedMuons, lambda mu: op.deltaR(j.p4, mu.p4) < 0.4)),
+            op.NOT(op.rng_any(cleanedTaus, lambda tau: op.deltaR(j.p4, tau.p4) < 0.4)),
+            op.NOT(op.rng_any(sortedIDphotons,
+                   lambda ph: op.deltaR(j.p4, ph.p4) < 0.2))
+        ))
+
+        btaggedJets = op.select(
+            cleanedJets, lambda j: j.btag & (1 << 1))  # medium  WP
 
         # mJets = op.invariant_mass(cleanedJets[0].p4, cleanedJets[1].p4)
         # hJets = op.sum(cleanedJets[0].p4, cleanedJets[1].p4)
 
         # met = op.select(t.metpuppi)
 
-      #selections
+      # selections
 
         # sel1 = noSel.refine("DiPhoton", cut=op.AND(
-            # (op.rng_len(looseIDPhotons) >= 2), (looseIDPhotons[0].pt > 35.)))
+        # (op.rng_len(looseIDPhotons) >= 2), (looseIDPhotons[0].pt > 35.)))
 
-        TwoTaus_sel = mgg_sel.refine("TwoPhTwoTau", cut=op.rng_len(cleanedTaus) >= 2)
+        TwoTaus_sel = mgg_sel.refine(
+            "TwoPhTwoTau", cut=op.rng_len(cleanedTaus) >= 2)
 
-       #plots
+        OneJetSel = TwoTaus_sel.refine(
+            "twojetsel", cut=op.rng_len(cleanedJets) >= 1)
 
+        btaggedJetSel = OneJetSel.refine(
+            "btaggedjet", cut=op.rng_len(btaggedJets) >= 1)
 
+       # plots
 
-        # plots.append(Plot.make1D("LeadingPhotonPTtwoPhotonsSel", sortedIDphotons[0].pt, twoPhotonsSel, EqB(
-        #     30, 0., 250.), title="Leading Photon pT"))
+        plots.append(Plot.make1D("LeadingPhotonPTtwoPhotonsSel", sortedIDphotons[0].pt, twoPhotonsSel, EqB(
+            30, 0., 250.), title="Leading Photon pT"))
 
-        # plots.append(Plot.make1D("LeadingPhotonPTpTmggRatio_sel", sortedIDphotons[0].pt, mgg_sel, EqB(
-        #     30, 0., 250.), title="Leading Photon pT"))
+        plots.append(Plot.make1D("LeadingPhotonPTpTmggRatio_sel", sortedIDphotons[0].pt, mgg_sel, EqB(
+            30, 0., 250.), title="Leading Photon pT"))
 
         plots.append(Plot.make1D("leadingTau_pt", cleanedTaus[0].pt, TwoTaus_sel, EqB(
             30, 0., 250.), title="Leading Tau p_{T}"))
 
+        plots.append(Plot.make1D("leadingjet_pt", cleanedJets[0].pt, OneJetSel, EqB(
+            30, 0., 250.), title="Leading Jet p_{T}"))
+
+        plots.append(Plot.make1D("leadingbtaggedjet_pt", btaggedJets[0].pt, btaggedJetSel, EqB(
+            30, 0., 250.), title="Leading Btagged Jet p_{T}"))
+        
+        plots.append(Plot.make1D("gentau_pt", genTaus[0].pt, oneGenTauSel, EqB(
+            30, 0., 250.), title="Leading Gen Tau p_{T}"))
 
         return plots
