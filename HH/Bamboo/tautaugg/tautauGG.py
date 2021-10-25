@@ -300,120 +300,91 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
 
         plots = []
 
-        #H->gg
-
-        #selection of photons with eta in the detector acceptance
-        photons = op.select(t.gamma, lambda ph: op.AND(
-            op.abs(ph.eta) < 3, ph.pt > 25.))
-        #selection of photons with loose ID
-        cleanedPhotons = op.select(photons, lambda ph: ph.idpass & (1 << 0))
-
-        #sort photons by pT
-        sort_ph = op.sort(photons, lambda ph: -ph.pt)
-
-        #sortcleanphotons
-        sorted_ph = op.sort(cleanedPhotons, lambda ph: -ph.pt)
-
-        #selection: 2 photons (at least) in an event with invariant mass within [100,150]
-        hasTwoPh = noSel.refine("hasMassPhPh", cut=op.AND(
-            (op.rng_len(sort_ph) >= 2),
-            (op.in_range(100, op.invariant_mass(
-                sort_ph[0].p4, sort_ph[1].p4), 180))
-        ))
-
-        mGG = op.invariant_mass(sorted_ph[0].p4, sorted_ph[1].p4)
-        hGG = op.sum(sorted_ph[0].p4, sorted_ph[1].p4)
+        #select photons
+        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, op.NOT(op.in_range(1.442, op.abs(ph.eta), 1.566)), ph.pt > 25))
         
-        # objects
+        #selection of loose ID photon
+        looseIDPhotons = op.select(photons, lambda ph: ph.idpass & (1 << 0))
 
-        electrons = op.select(t.elec, lambda el: op.AND(
-            el.pt > 10., op.abs(el.eta) < 3
-        ))
-
-        muons = op.select(t.muon, lambda mu: op.AND(
-            mu.pt > 10., op.abs(mu.eta) < 3
-        ))
-
-        taus = op.select(t.tau, lambda ta: op.AND(
-            ta.pt > 20., op.abs(ta.eta) < 3
-        ))
-
-        identifiedElectrons = op.select(
-            electrons, lambda el: el.idpass & (1 << 0))  # loose ID
-        cleanedElectrons = op.select(identifiedElectrons, lambda el: op.NOT(
-            op.rng_any(photons, lambda ph: op.deltaR(el.p4, ph.p4) < 0.4)))  # dR
-
-        isolatedMuons = op.select(
-            muons, lambda mu: mu.isopass & (1 << 2))  # tight ID & ISO
-        identifiedMuons = op.select(
-            isolatedMuons, lambda mu: mu.idpass & (1 << 2))
-        cleanedMuons = op.select(identifiedMuons, lambda mu: op.NOT(
-            op.rng_any(photons, lambda ph: op.deltaR(mu.p4, ph.p4) < 0.4)))
-
-        isolatedTaus = op.select(taus, lambda ta: ta.isopass & (1 << 2))
-        cleanedTaus = op.select(isolatedTaus, lambda ta: op.NOT(
-            op.rng_any(photons, lambda ph: op.deltaR(ta.p4, ph.p4) < 0.4)))
-
-        #select jets with pt>25 GeV end eta in the detector acceptance
-        jets = op.select(t.jetpuppi, lambda jet: op.AND(
-            jet.pt > 30., op.abs(jet.eta) < 2.5))
-
-        identifiedJets = op.select(jets, lambda j: j.idpass & (1 << 2))
-        cleanedJets = op.select(identifiedJets, lambda j: op.AND(
-            op.NOT(op.rng_any(identifiedElectrons, lambda el: op.deltaR(
-                el.p4, j.p4) < 0.4)),  # identified or cleaned mu/e ?
-            op.NOT(op.rng_any(identifiedMuons,
-                   lambda mu: op.deltaR(mu.p4, j.p4) < 0.4))
-        ))
-
-        mJets = op.invariant_mass(cleanedJets[0].p4, cleanedJets[1].p4)
-        hJets = op.sum(cleanedJets[0].p4, cleanedJets[1].p4)
-
-        met = op.select(t.metpuppi)
+        #sortIDphotons
+        sortedIDphotons = op.sort(looseIDPhotons, lambda ph: -ph.pt)
         
-        mTauTau = op.invariant_mass(cleanedTaus[0].p4, cleanedTaus[1].p4)
+        mgg = op.invariant_mass(sortedIDphotons[0].p4, sortedIDphotons[1].p4)
+
+        #selection: at least 2 photons with invariant mass within [100,150]
+        twoPhotonsSel = noSel.refine("hasInvMassPhPh", cut=op.rng_len(sortedIDphotons) >= 2 )
+        
+        # pT/InvM(gg) > 0.33 selection for leading photon
+        pTmggRatioLeading_sel = twoPhotonsSel.refine( "ptMggLeading", cut= op.product(sortedIDphotons[0].pt, op.pow(mgg, -1)) > 0.33 )
+        pTmggRatio_sel = pTmggRatioLeading_sel.refine("ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)
+        mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut = [mgg > 100])
+        
+        # electrons
+
+        electrons = op.select(t.elec, lambda el: op.AND(op.abs(el.eta) < 3, op.NOT(op.in_range(1.442, op.abs(el.eta), 1.566)), el.pt > 10.))
+
+        IDelectrons = op.select(electrons, lambda el: el.idpass & (1 << 0))  # loose ID
+        
+        cleanedElectrons = op.select(IDelectrons, lambda el: op.NOT(
+            op.rng_any(sortedIDphotons, lambda ph: op.deltaR(el.p4, ph.p4) < 0.2)))
+        
+        # muons
+        
+        muons = op.select(t.muon, lambda mu: op.AND(mu.pt > 10., op.abs(mu.eta) < 3))
+
+        isolatedMuons = op.select(muons, lambda mu: mu.isopass & (1 << 2))
+        
+        IDmuons = op.select(isolatedMuons, lambda mu: mu.idpass & (1 << 2)) # tight ID
+        
+        cleanedMuons = op.select(IDmuons, lambda mu: op.NOT(
+            op.rng_any(sortedIDphotons, lambda ph: op.deltaR(mu.p4, ph.p4) < 0.2)))
+        
+        # taus
+
+        taus = op.select(t.tau, lambda tau: op.AND(tau.pt > 20., op.abs(tau.eta) < 3))
+
+        isolatedTaus = op.select(taus, lambda tau: tau.isopass & (1 << 2))
+        
+        cleanedTaus = op.select(isolatedTaus, lambda tau: op.NOT(op.AND(op.rng_any(sortedIDphotons, lambda ph: op.deltaR(tau.p4, ph.p4) < 0.2),
+                                                                        op.rng_any(cleanedElectrons, lambda el: op.deltaR(tau.p4, el.p4) < 0.2),
+                                                                        op.rng_any(cleanedMuons, lambda mu: op.deltaR(tau.p4, mu.p4) < 0.2))))
+
+        # #select jets with pt>25 GeV end eta in the detector acceptance
+        # jets = op.select(t.jetpuppi, lambda jet: op.AND(
+        #     jet.pt > 30., op.abs(jet.eta) < 2.5))
+
+        # identifiedJets = op.select(jets, lambda j: j.idpass & (1 << 2))
+        # cleanedJets = op.select(identifiedJets, lambda j: op.AND(
+        #     op.NOT(op.rng_any(identifiedElectrons, lambda el: op.deltaR(
+        #         el.p4, j.p4) < 0.4)),  # identified or cleaned mu/e ?
+        #     op.NOT(op.rng_any(identifiedMuons,
+        #            lambda mu: op.deltaR(mu.p4, j.p4) < 0.4))
+        # ))
+
+        # mJets = op.invariant_mass(cleanedJets[0].p4, cleanedJets[1].p4)
+        # hJets = op.sum(cleanedJets[0].p4, cleanedJets[1].p4)
+
+        # met = op.select(t.metpuppi)
 
       #selections
 
-        sel1 = noSel.refine("DiPhoton", cut=op.AND(
-            (op.rng_len(sorted_ph) >= 2), (sorted_ph[0].pt > 35.)))
+        # sel1 = noSel.refine("DiPhoton", cut=op.AND(
+            # (op.rng_len(looseIDPhotons) >= 2), (looseIDPhotons[0].pt > 35.)))
 
-        sel2 = sel1.refine("TwoPhTwoTau", cut=op.rng_len(cleanedTaus) >= 2)
+        TwoTaus_sel = mgg_sel.refine("TwoPhTwoTau", cut=op.rng_len(cleanedTaus) >= 2)
 
        #plots
 
-       #noSel
 
-       #sel1
-        plots.append(Plot.make1D("LeadingPhotonPTSel1", sorted_ph[0].pt, sel1, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
 
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel1", sorted_ph[1].pt, sel1, EqB(
-            30, 0., 250.), title="SubLeading Photon pT"))
-        
-        plots.append(Plot.make1D("Inv_mass_ggSel1", mGG, sel1,
-                     EqB(50, 0., 400.), title="m_{\gamma\gamma}"))
+        # plots.append(Plot.make1D("LeadingPhotonPTtwoPhotonsSel", sortedIDphotons[0].pt, twoPhotonsSel, EqB(
+        #     30, 0., 250.), title="Leading Photon pT"))
 
-       #sel2
+        # plots.append(Plot.make1D("LeadingPhotonPTpTmggRatio_sel", sortedIDphotons[0].pt, mgg_sel, EqB(
+        #     30, 0., 250.), title="Leading Photon pT"))
 
-        plots.append(Plot.make1D("LeadingPhotonPTSel2", sorted_ph[0].pt, sel2, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
+        plots.append(Plot.make1D("leadingTau_pt", cleanedTaus[0].pt, TwoTaus_sel, EqB(
+            30, 0., 250.), title="Leading Tau p_{T}"))
 
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel2", sorted_ph[1].pt, sel2, EqB(
-            30, 0., 250.), title="SubLeading Photon pT"))
-
-        plots.append(Plot.make1D("Inv_mass_ggSel2", mGG, sel2,
-                     EqB(50, 100., 150.), title="m_{\gamma\gamma}"))
-
-        
-
-       #yields
-        cfr = CutFlowReport("yields")
-        
-        cfr.add(noSel, "Sel0: No selection")
-        cfr.add(sel1, "Sel1: Two Photons")
-        cfr.add(sel2, "Sel2: Two Taus")
-        
-        plots.append(cfr)
 
         return plots
