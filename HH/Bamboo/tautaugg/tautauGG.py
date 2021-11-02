@@ -238,16 +238,18 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
         ])
 
 
-
-def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCounters=lambda f: -1., eras=("all", None), verbose=False):
+def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=None, readCounters=lambda f: -1., eras=("all", None), verbose=False):
     """
     Print yields to the log file, and write a LaTeX yields table for each
+
     Samples can be grouped (only for the LaTeX table) by specifying the
     ``yields-group`` key (overriding the regular ``groups`` used for plots).
     The sample (or group) name to use in this table should be specified
     through the ``yields-title`` sample key.
+
     In addition, the following options in the ``plotIt`` section of
     the YAML configuration file influence the layout of the LaTeX yields table:
+
     - ``yields-table-stretch``: ``\\arraystretch`` value, 1.15 by default
     - ``yields-table-align``: orientation, ``h`` (default), samples in rows, or ``v``, samples in columns
     - ``yields-table-text-align``: alignment of text in table cells (default: ``c``)
@@ -257,24 +259,27 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
     eraMode, eras = eras
     if not eras:  # from config if not specified
         eras = list(config["eras"].keys())
-    # helper: print one bamboo.plots.CutFlowReport.Entry
+    ## helper: print one bamboo.plots.CutFlowReport.Entry
 
     def printEntry(entry, printFun=logger.info, recursive=True, genEvents=None):
-        effMsg = ""
-        if entry.parent:
-            sumPass = entry.nominal.GetBinContent(1)
-            sumTotal = entry.parent.nominal.GetBinContent(1)
-            if sumTotal != 0.:
-                effMsg = f", Eff={sumPass/sumTotal:.2%}"
-                if genEvents:
-                    effMsg += f", TotalEff={sumPass/genEvents:.2%}"
-        printFun(
-            f"Selection {entry.name}: N={entry.nominal.GetEntries()}, SumW={entry.nominal.GetBinContent(1)}{effMsg}")
+        if entry.nominal is not None:
+            effMsg = ""
+            if entry.parent:
+                sumPass = entry.nominal.GetBinContent(1)
+                sumTotal = (entry.parent.nominal.GetBinContent(
+                    1) if entry.parent.nominal is not None else 0.)
+                if sumTotal != 0.:
+                    effMsg = f", Eff={sumPass/sumTotal:.2%}"
+                    if genEvents:
+                        effMsg += f", TotalEff={sumPass/genEvents:.2%}"
+            printFun(
+                f"Selection {entry.name}: N={entry.nominal.GetEntries()}, SumW={entry.nominal.GetBinContent(1)}{effMsg}")
         if recursive:
             for c in entry.children:
                 printEntry(c, printFun=printFun,
                            recursive=recursive, genEvents=genEvents)
-    # retrieve results files, get generated events for each sample
+
+    ## retrieve results files, get generated events for each sample
     from bamboo.root import gbl
     resultsFiles = dict()
     generated_events = dict()
@@ -306,13 +311,13 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
     for report in reportList:
         smpReports = {smp: report.readFromResults(
             resF) for smp, resF in resultsFiles.items()}
-        # debug print
+        ## debug print
         for smp, smpRep in smpReports.items():
-            if smpRep.printInLog:
-                logger.info(f"Cutflow report {report.name} for sample {smp}")
-                for root in smpRep.rootEntries():
-                    printEntry(root, genEvents=generated_events[smp])
-        # save yields.tex (if needed)
+            #if smpRep.printInLog:
+            logger.info(f"Cutflow report {report.name} for sample {smp}")
+            for root in smpRep.rootEntries():
+                printEntry(root, genEvents=generated_events[smp])
+        ## save yields.tex (if needed)
         if any(len(cb) > 1 or tt != cb[0] for tt, cb in report.titles.items()):
             if not has_plotit:
                 logger.error(
@@ -322,10 +327,18 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
                                for tEntries in report.titles.values() for eName in tEntries]
                 out_eras = []
                 if len(eras) > 1 and eraMode in ("all", "combined"):
-                    out_eras.append((f"{report.name}.tex", eras))
+                    nParts = [report.name]
+                    if suffix:
+                        nParts.append(suffix)
+                    out_eras.append(("{0}.tex".format("_".join(nParts)), eras))
                 if len(eras) == 1 or eraMode in ("split", "all"):
                     for era in eras:
-                        out_eras.append((f"{report.name}_{era}.tex", [era]))
+                        nParts = [report.name]
+                        if suffix:
+                            nParts.append(suffix)
+                        nParts.append(era)
+                        out_eras.append(
+                            ("{0}.tex".format("_".join(nParts)), [era]))
                 for outName, iEras in out_eras:
                     pConfig, samples, plots, _, _ = loadPlotIt(
                         config, yield_plots, eras=iEras, workdir=workdir, resultsdir=resultsdir, readCounters=readCounters)
@@ -337,10 +350,14 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", readCou
                                                    align=pConfig.yields_table_text_align,
                                                    yieldPrecision=pConfig.yields_table_numerical_precision_yields,
                                                    ratioPrecision=pConfig.yields_table_numerical_precision_ratio)
-                    with open(os.path.join(workdir, outName), "w") as ytf:
-                        ytf.write("\n".join((_yieldsTexPreface, tabBlock)))
-                    logger.info("Yields table for era(s) {0} was written to {1}".format(
-                        ",".join(eras), os.path.join(workdir, outName)))
+                    if tabBlock:
+                        with open(os.path.join(workdir, outName), "w") as ytf:
+                            ytf.write("\n".join((_yieldsTexPreface, tabBlock)))
+                        logger.info("Yields table for era(s) {0} was written to {1}".format(
+                            ",".join(iEras), os.path.join(workdir, outName)))
+                    else:
+                        logger.warning(
+                            f"No samples for era(s) {','.join(iEras)}, so no yields.tex")
 
 # END cutflow reports, adapted from bamboo.analysisutils
 
