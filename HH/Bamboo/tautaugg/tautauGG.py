@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 _yieldsTexPreface = "\n".join(f"{ln}" for ln in
                               r"""\documentclass[12pt, landscape]{article}
-\usepackage[margin=0.5in]{geometry}
+\usepackage[margin=0.2in, a3paper]{geometry}
 \begin{document}
 """.split("\n"))
 
@@ -53,7 +53,7 @@ def _texProcName(procName):
         procName = procName.replace("_", "\_")
     return procName
     
-def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v", align="c", yieldPrecision=1, ratioPrecision=2):
+def _makeYieldsTexTable(MCevents, report, samples, entryPlots, stretch=1.5, orientation="v", align="c", yieldPrecision=1, ratioPrecision=2):
     if orientation not in ("v", "h"):
         raise RuntimeError(
             f"Unsupported table orientation: {orientation} (valid: 'h' and 'v')")
@@ -95,7 +95,7 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
     def colEntriesFromCFREntryHists_forEff(report, entryHists, precision=1, showUncert=True):
         stacks_t = []
         colEntries = []
-        for entries in report.titles.values():
+        for entries in report.titles.values(): # selection names
             s_entries = []
             for eName in entries:
                 eh = entryHists[eName]
@@ -119,9 +119,9 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
     smp_data = [smp for smp in samples if smp.cfg.type == "DATA"]
     sepStr = "|l|"
     smpHdrs = []
-    titles = list(report.titles.keys())
+    titles = list(report.titles.keys()) # titles are selections
     entries_smp = []
-    stTotSig, stTotMC, stTotData = None, None, None
+    stTotSig, stTotMC, stTotData = None, None, None   
     if smp_signal:
         sepStr += "|"
         sel_list = []
@@ -130,7 +130,7 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
                                                         {eName: getHist(sigSmp, p) for eName, p in entryPlots.items()}, precision=yieldPrecision)
             sepStr += f"{align}|"
             smpHdrs.append(
-                f"${_texProcName(sigSmp.cfg.yields_group)}$")
+                f"${_texProcName(sigSmp.cfg.yields_group)}$") # sigSmp.cfg.yields_group is the name in the legend
             _, colEntries_forEff = colEntriesFromCFREntryHists_forEff(report, {eName: sigSmp.getHist(p) for eName, p in entryPlots.items()}, precision=yieldPrecision)
             colEntries_matrix = np.array(colEntries_forEff)
             sel_eff = np.array([100])
@@ -141,7 +141,8 @@ def _makeYieldsTexTable(report, samples, entryPlots, stretch=1.5, orientation="v
                 sel_eff[i] = str(f"({sel_eff[i]:.2f}\%)")
             colEntries_withEff = []
             for i, entry in enumerate(colEntries):
-                colEntries_withEff.append("{0} {1}".format(entry, sel_eff[i]))
+                colEntries_withEff.append("{0} {1} {2}".format(
+                    entry, sel_eff[i], MCevents[sigSmp.cfg.pretty_name.rstrip(".root")][0][i]))
             entries_smp.append(colEntries_withEff)
         if len(smp_signal) > 1:
             sepStr += f"|{align}|"
@@ -272,12 +273,18 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=
                     effMsg = f", Eff={sumPass/sumTotal:.2%}"
                     if genEvents:
                         effMsg += f", TotalEff={sumPass/genEvents:.2%}"
-            printFun(
-                f"Selection {entry.name}: N={entry.nominal.GetEntries()}, SumW={entry.nominal.GetBinContent(1)}{effMsg}")
+            printFun(f"Selection {entry.name}: N={entry.nominal.GetEntries()}), SumW={entry.nominal.GetBinContent(1)}{effMsg}")
+            printFun(f"Selection {entry.name}: N={entry.nominal.GetEntries()}")
         if recursive:
             for c in entry.children:
                 printEntry(c, printFun=printFun,
                            recursive=recursive, genEvents=genEvents)
+
+    def unwMCevents(entry, smp, mcevents, genEvents=None):
+        mcevents.append(entry.nominal.GetEntries())
+        for c in entry.children:
+            unwMCevents(c, smp, mcevents, genEvents=genEvents)
+        return mcevents
 
     ## retrieve results files, get generated events for each sample
     from bamboo.root import gbl
@@ -312,11 +319,15 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=
         smpReports = {smp: report.readFromResults(
             resF) for smp, resF in resultsFiles.items()}
         ## debug print
+        MCevents = {}
         for smp, smpRep in smpReports.items():
             #if smpRep.printInLog:
             logger.info(f"Cutflow report {report.name} for sample {smp}")
+            MCevents[smp] = []
             for root in smpRep.rootEntries():
                 printEntry(root, genEvents=generated_events[smp])
+                mcevents = []
+                MCevents[smp].append(unwMCevents(root, smp, mcevents, genEvents=generated_events[smp]))
         ## save yields.tex (if needed)
         if any(len(cb) > 1 or tt != cb[0] for tt, cb in report.titles.items()):
             if not has_plotit:
@@ -342,7 +353,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=
                 for outName, iEras in out_eras:
                     pConfig, samples, plots, _, _ = loadPlotIt(
                         config, yield_plots, eras=iEras, workdir=workdir, resultsdir=resultsdir, readCounters=readCounters)
-                    tabBlock = _makeYieldsTexTable(report, samples,
+                    tabBlock = _makeYieldsTexTable(MCevents, report, samples,
                                                    {p.name[len(
                                                        report.name)+1:]: p for p in plots},
                                                    stretch=pConfig.yields_table_stretch,
@@ -404,7 +415,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
 
         # count no of events here
 
-        noSel = noSel.refine("withgenweight", weight=t.genweight)
+        genweightsel = noSel.refine("withgenweight", weight=t.genweight)
 
         plots = []
 
@@ -426,10 +437,10 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             "hasInvMassPhPh", cut=op.AND(op.rng_len(sortedIDphotons) >= 2, sortedIDphotons[0].pt > 35, sortedIDphotons[1].pt > 25))  # sel1
 
         # pT/InvM(gg) > 0.33 selection for leading photon
-        pTmggRatioLeading_sel = twoPhotonsSel.refine(
-            "ptMggLeading", cut=op.product(sortedIDphotons[0].pt, op.pow(mgg, -1)) > 0.33)
-        pTmggRatio_sel = pTmggRatioLeading_sel.refine(
-            "ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)  # sel2
+        pTmggRatio_sel = twoPhotonsSel.refine(
+            "ptMggLeading", cut=(op.AND(op.product(sortedIDphotons[0].pt, op.pow(mgg, -1)) > 0.33), op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25))
+        # pTmggRatio_sel = pTmggRatioLeading_sel.refine(
+        #     "ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)  # sel2
 
         mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut = [mgg > 100])  # sel3
 
