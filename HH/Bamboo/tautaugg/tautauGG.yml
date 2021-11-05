@@ -184,7 +184,7 @@ plotIt:
   configuration:
     width: 700
     height: 600
-    luminosity-label: '33 fb^{-1} (13 TeV)'
+    luminosity-label: '40 fb^{-1} (13 TeV)'
     experiment: CMS
     extra-label: HL-LHC
     luminosity-error: 0.025
