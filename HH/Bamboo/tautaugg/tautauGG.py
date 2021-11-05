@@ -121,7 +121,7 @@ def _makeYieldsTexTable(MCevents, report, samples, entryPlots, stretch=1.5, orie
     smpHdrs = []
     titles = list(report.titles.keys()) # titles are selections
     entries_smp = []
-    stTotSig, stTotMC, stTotData = None, None, None   
+    stTotSig, stTotMC, stTotData = None, None, None
     if smp_signal:
         sepStr += "|"
         sel_list = []
@@ -157,7 +157,7 @@ def _makeYieldsTexTable(MCevents, report, samples, entryPlots, stretch=1.5, orie
                                                               {eName: getHist(mcSmp, p) for eName, p in entryPlots.items()}, precision=yieldPrecision)
             sepStr += f"{align}|"
             if isinstance(mcSmp, plotit.plotit.Group):
-                smpHdrs.append(_texProcName(mcSmp.name))
+                smpHdrs.append(f"${_texProcName(mcSmp.name)}$")
             else:
                 smpHdrs.append(f"${_texProcName(mcSmp.cfg.yields_group)}$")
             _, colEntries_forEff = colEntriesFromCFREntryHists_forEff(report, {eName: mcSmp.getHist(
@@ -171,7 +171,8 @@ def _makeYieldsTexTable(MCevents, report, samples, entryPlots, stretch=1.5, orie
                 sel_eff[i] = str(f"({sel_eff[i]:.2f}\%)")
             colEntries_withEff = []
             for i, entry in enumerate(colEntries):
-                colEntries_withEff.append("{0} {1}".format(entry, sel_eff[i]))
+                colEntries_withEff.append("{0} {1} {2}".format(
+                    entry, sel_eff[i], MCevents[mcSmp.cfg.pretty_name.rstrip(".root")][0][i]))
             entries_smp.append(colEntries_withEff)
         if len(smp_mc) > 1:
             sepStr += f"|{align}|"
@@ -273,7 +274,7 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=
                     effMsg = f", Eff={sumPass/sumTotal:.2%}"
                     if genEvents:
                         effMsg += f", TotalEff={sumPass/genEvents:.2%}"
-            printFun(f"Selection {entry.name}: N={entry.nominal.GetEntries()}), SumW={entry.nominal.GetBinContent(1)}{effMsg}")
+            printFun(f"Selection {entry.name}: N={entry.nominal.GetEntries()}, SumW={entry.nominal.GetBinContent(1)}{effMsg}")
             printFun(f"Selection {entry.name}: N={entry.nominal.GetEntries()}")
         if recursive:
             for c in entry.children:
@@ -442,7 +443,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         # pTmggRatio_sel = pTmggRatioLeading_sel.refine(
         #     "ptMggLead_Subleading", cut=op.product(sortedIDphotons[1].pt, op.pow(mgg, -1)) > 0.25)  # sel2
 
-        mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut = [mgg > 100])  # sel3
+        mgg_sel = pTmggRatio_sel.refine("mgg_sel", cut = [op.in_range(100, mgg, 180)])  # sel3
 
         # electrons
 
@@ -540,34 +541,34 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
        
 
         plots.append(Plot.make1D("LeadingPhotonPTSel1", sortedIDphotons[0].pt, twoPhotonsSel, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
+            10, 30., 1500.), title="Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("LeadingPhotonPTSel2", sortedIDphotons[0].pt, pTmggRatio_sel, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
+            10, 30., 1500.), title="Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("LeadingPhotonPTSel3", sortedIDphotons[0].pt, mgg_sel, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
+            10, 30., 1500.), title="Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("LeadingPhotonPTSel4", sortedIDphotons[0].pt, twoTausSel, EqB(
-            30, 0., 250.), title="Leading Photon pT"))
+            10, 30., 500.), title="Leading Photon pT"))
         
         plots.append(Plot.make1D("SubLeadingPhotonPTSel1", sortedIDphotons[1].pt, twoPhotonsSel, EqB(
-            30, 0., 250.), title="Sub-Leading Photon pT"))
+            10, 20., 800.), title="Sub-Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("SubLeadingPhotonPTSel2", sortedIDphotons[1].pt, pTmggRatio_sel, EqB(
-            30, 0., 250.), title="Sub-Leading Photon pT"))
+            10, 20., 800.), title="Sub-Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("SubLeadingPhotonPTSel3", sortedIDphotons[1].pt, mgg_sel, EqB(
-            30, 0., 250.), title="Sub-Leading Photon pT"))
+            10, 20., 800.), title="Sub-Leading Photon pT", plotopts={"log-y": True}))
         plots.append(Plot.make1D("SubLeadingPhotonPTSel4", sortedIDphotons[1].pt, twoTausSel, EqB(
-            30, 0., 250.), title="Sub-Leading Photon pT"))
+            10, 20., 300.), title="Sub-Leading Photon pT"))
 
         plots.append(Plot.make1D("leadingTau_ptSel4", cleanedTaus[0].pt, twoTausSel, EqB(
-            30, 0., 250.), title="Leading Tau p_{T}"))
+            30, 0., 400.), title="Leading Tau p_{T}"))
 
         plots.append(Plot.make1D("MggSel1", mgg, twoPhotonsSel, EqB(
-            30, 100., 180.), title="M_{\gamma\gamma}"))
+            30, 0., 1500.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
         plots.append(Plot.make1D("MggSel2", mgg, pTmggRatio_sel, EqB(
-            30, 100., 180.), title="M_{\gamma\gamma}"))
+            30, 0., 1500.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
         plots.append(Plot.make1D("MggSel3", mgg, mgg_sel, EqB(
-            30, 100., 180.), title="M_{\gamma\gamma}"))
+            30, 90., 190.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
         plots.append(Plot.make1D("MggSel4", mgg, twoTausSel, EqB(
-            30, 100., 180.), title="M_{\gamma\gamma}"))
+            30, 90, 190.), title="M_{\gamma\gamma}"))
         
         cfr = CutFlowReport("yields", recursive=True, printInLog=False)
         plots.append(cfr)
