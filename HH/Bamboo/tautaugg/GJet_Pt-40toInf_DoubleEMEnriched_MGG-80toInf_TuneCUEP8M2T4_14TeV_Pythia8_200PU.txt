@@ -1,0 +1,1 @@
+root://se01.indiacms.res.in:1094//dpm/indiacms.res.in/home/cms/store/group/Snowmass_2021_2022/DelphesNtuplizer/GJet_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCUEP8M2T4_14TeV_Pythia8_200PU/GJet_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCUEP8M2T4_14TeV_Pythia8_ntuple_0_0.root

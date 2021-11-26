@@ -32,7 +32,6 @@ class CMSPhase2SimRTBModule(AnalysisModule):
     def readCounters(self, resultsFile):
         return {"sumgenweight": resultsFile.Get("h_count_genweight").GetBinContent(1)}
 
-
 class CMSPhase2SimHistoModule(CMSPhase2SimRTBModule, HistogramsModule):
     """ Base module for producing plots from Phase2 flat trees """
 
@@ -76,35 +75,33 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         plots = []
 
         # select photons
-        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, op.NOT(
-            op.in_range(1.442, op.abs(ph.eta), 1.566)), ph.pt > 10))
-
+        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, op.NOT(op.in_range(1.442, op.abs(ph.eta), 1.566)), ph.pt > 10))
+        
         # select loose ISO photons
         ISOphotons = op.select(photons, lambda ph: ph.isopass & (1 << 0))
-
+        
         # select loose ID photons
         IDphotons = op.select(ISOphotons, lambda ph: ph.idpass & (1 << 0))
-
+                
         # Photon selections
         hasOnePh = noSel.refine("hasOnePh", cut=op.rng_len(photons) >= 1)
-
+        
         hasOneIDPh = noSel.refine("hasOneIDPh", cut=op.rng_len(IDphotons) >= 1)
 
         # electrons
         electrons = op.select(t.elec, lambda el: op.AND(op.abs(el.eta) < 3, op.NOT(
             op.in_range(1.442, op.abs(el.eta), 1.566)), el.pt > 10.))
-
+        
         # select loose ISO electrons
         ISOelectrons = op.select(electrons, lambda el: el.isopass & (1 << 0))
 
         # select loose ID electrons
         IDelectrons = op.select(ISOelectrons, lambda el: el.idpass & (1 << 0))
-
+        
         # Electron selections
         hasOneEl = noSel.refine("hasOneElec", cut=[op.rng_len(electrons) >= 1])
-
-        hasOneIDel = hasOneEl.refine(
-            "hasOneIDelec", cut=[op.rng_len(IDelectrons) >= 1])
+        
+        hasOneIDel = hasOneEl.refine("hasOneIDelec", cut=[op.rng_len(IDelectrons) >= 1])
 
         # muons
         muons = op.select(t.muon, lambda mu: op.AND(
@@ -116,11 +113,12 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         # select loose ID muons
         IDmuons = op.select(
             ISOmuons, lambda mu: mu.idpass & (1 << 0))
-
+        
         # muon selections
         hasOneMu = noSel.refine("hasOneMuon", cut=[op.rng_len(muons) >= 1])
         hasOneIDmu = hasOneMu.refine(
             "hasOneIDmuon", cut=[op.rng_len(IDmuons) >= 1])
+
 
        # plots
 
@@ -128,15 +126,15 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             50, 0., 250.), title="Leading Photon pT"))
         plots.append(Plot.make1D("LeadingPhotonPtID_Eff", IDphotons[0].pt, hasOneIDPh, EqB(
             50, 0., 250.), title="Leading Photon pT"))
-
+        
         plots.append(Plot.make1D("LeadingElectronPTnonID", electrons[0].pt, hasOneEl, EqB(
             50, 0., 250.), title="Leading Electron pT"))
         plots.append(Plot.make1D("LeadingElectronPtID_Eff", IDelectrons[0].pt, hasOneIDel, EqB(
             50, 0., 250.), title="Leading Electron pT"))
-
+        
         plots.append(Plot.make1D("LeadingMuonPTnonID", muons[0].pt, hasOneMu, EqB(
             50, 0., 250.), title="Leading Muon pT"))
         plots.append(Plot.make1D("LeadingMuonPtID_Eff", IDmuons[0].pt, hasOneIDmu, EqB(
             50, 0., 250.), title="Leading Muon pT"))
-
+        
         return plots

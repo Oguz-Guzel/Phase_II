@@ -1,0 +1,1 @@
+root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/QCD_Pt-5toInf_EMEnriched_TuneCUETP8M1_14TeV_pythia8_200PU/QCD_Pt-5toInf_EMEnriched_TuneCUETP8M1_14TeV_pythia8_ntuple_0_0.root

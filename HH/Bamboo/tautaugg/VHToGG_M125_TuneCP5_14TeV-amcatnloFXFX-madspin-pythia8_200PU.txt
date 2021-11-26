@@ -1,0 +1,2 @@
+root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/VHToGG_M125_TuneCP5_14TeV-amcatnloFXFX-madspin-pythia8_200PU/VHToGG_M125_TuneCP5_14TeV-amcatnloFXFX-madspin-pythia8_ntuple_0_0.root
+root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/VHToGG_M125_TuneCP5_14TeV-amcatnloFXFX-madspin-pythia8_200PU/VHToGG_M125_TuneCP5_14TeV-amcatnloFXFX-madspin-pythia8_ntuple_0_1.root

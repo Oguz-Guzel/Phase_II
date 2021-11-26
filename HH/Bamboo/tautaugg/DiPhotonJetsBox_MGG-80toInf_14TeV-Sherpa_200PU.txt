@@ -1,0 +1,1 @@
+root://se01.indiacms.res.in:1094//dpm/indiacms.res.in/home/cms/store/group/Snowmass_2021_2022/DelphesNtuplizer/DiPhotonJetsBox_MGG-80toInf_14TeV-Sherpa_200PU/DiPhotonJetsBox_MGG-80toInf_14TeV-Sherpa_ntuple_0_0.root

@@ -1,0 +1,1 @@
+root://se01.indiacms.res.in:1094//dpm/indiacms.res.in/home/cms/store/group/Snowmass_2021_2022/DelphesNtuplizer/TTGG_0Jets_TuneCUETP8M1_14TeV_amcatnlo_madspin_pythia8_200PU/TTGG_0Jets_TuneCUETP8M1_14TeV_amcatnlo_madspin_pythia8_ntuple_0_0.root
