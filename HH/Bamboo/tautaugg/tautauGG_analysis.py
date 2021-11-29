@@ -412,9 +412,9 @@ class CMSPhase2SimHistoModule(CMSPhase2SimRTBModule, HistogramsModule):
         eraMode, eras = self.args.eras
         if eras is None:
             eras = list(config["eras"].keys())
-        if plotList_cutflowreport:
-            printCutFlowReports(config, plotList_cutflowreport, workdir=workdir, resultsdir=resultsdir,
-                                readCounters=self.readCounters, eras=(eraMode, eras), verbose=self.args.verbose)
+        # if plotList_cutflowreport:
+        #     printCutFlowReports(config, plotList_cutflowreport, workdir=workdir, resultsdir=resultsdir,
+        #                         readCounters=self.readCounters, eras=(eraMode, eras), verbose=self.args.verbose)
         if plotList_plotIt:
             from bamboo.analysisutils import writePlotIt, runPlotIt
             cfgName = os.path.join(workdir, "plots.yml")
@@ -506,7 +506,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         
         
         
-        ZvetoSel = twoTausSel.refine("Zveto", cut = op.AND(mtt < 80, mtt > 100))
+        ZvetoSel = twoTausSel.refine("Zveto", cut = op.NOT(op.in_range(80, mtt, 100)))
 
         # jets
 
@@ -568,9 +568,9 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             30, 100, 180.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
         
         plots.append(Plot.make1D("MttSel3", mtt, twoTausSel, EqB(
-            30, 0, 1000.), title="M_{\tau\tau}", plotopts={"log-y": True}))
+            30, 0, 200.), title="M_{\tau\tau}", plotopts={"log-y": True}))
         plots.append(Plot.make1D("MttSel4", mtt, ZvetoSel, EqB(
-            30, 0, 1000.), title="M_{\tau\tau}", plotopts={"log-y": True}))
+            30, 0, 200.), title="M_{\tau\tau}", plotopts={"log-y": True}))
 
         cfr = CutFlowReport("yields", recursive=True, printInLog=False)
         plots.append(cfr)
