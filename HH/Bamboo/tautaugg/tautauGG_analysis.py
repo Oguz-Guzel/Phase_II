@@ -301,7 +301,8 @@ def printCutFlowReports(config, reportList, workdir=".", resultsdir=".", suffix=
                            recursive=recursive, genEvents=genEvents)
 
     def unwMCevents(entry, smp, mcevents, genEvents=None):
-        mcevents.append(entry.nominal.GetEntries())
+        if entry.nominal is not None:
+            mcevents.append(entry.nominal.GetEntries())
         for c in entry.children:
             unwMCevents(c, smp, mcevents, genEvents=genEvents)
         return mcevents
@@ -434,30 +435,37 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         from bamboo.plots import EquidistantBinning as EqB
         from bamboo import treefunctions as op
 
-
         plots = []
 
         # Photons
-        photons = op.select(t.gamma, lambda ph: op.AND(op.abs(ph.eta) < 3, ph.pt > 10))
 
-        ISOphotons = op.select(photons, lambda ph: ph.isopass & (1 << 0)) # loose working point
+        photons = op.sort(
+            op.select(t.gamma, lambda ph: op.abs(ph.eta) < 3), lambda ph: -ph.pt)
 
-        IDphotons = op.select(
-            ISOphotons, lambda ph: ph.idpass & (1 << 0))
+        ISOphotons = op.select(photons, lambda ph: ph.isopass & (
+            1 << 2))
+
+        IDphotons = op.select(ISOphotons, lambda ph: ph.idpass & (
+            1 << 2))
 
         # di-Photon mass
         mgg = op.invariant_mass(IDphotons[0].p4, IDphotons[1].p4)
 
-        # Photon selection 1: at least 2 photons with leading photon p_T > 35 and sub-leading photon p_T > 25
+        # di-Photon preselection 1: at least 2 photons with leading photon p_T > 35 and sub-leading photon p_T > 25
         twoPhotonsSel = noSel.refine(
-            "twoPhotons", cut = op.AND(op.rng_len(IDphotons) >= 2, IDphotons[0].pt > 35, IDphotons[1].pt > 25))
+            "twoPhotons", cut=op.AND(op.rng_len(IDphotons) >= 2, IDphotons[0].pt > 35, IDphotons[1].pt > 25))
 
-        # Photon selection 2: pT/mgg > 0.33 for leading photon and 0.25 for sub-leading photon
+        # di-Photon preselection 2: pT/mgg > 0.33 for leading photon and 0.25 for sub-leading photon
         pTmggRatio_sel = twoPhotonsSel.refine(
-            "ptMggRatio", cut = op.AND(IDphotons[0].pt / mgg > 0.33, IDphotons[1].pt / mgg > 0.25))
+            "ptMggRatio", cut=op.AND(IDphotons[0].pt / mgg > 0.33, IDphotons[1].pt / mgg > 0.25))
+
+        # di-Photon preselection 3: Invarient mass cut
+        mgg_sel = pTmggRatio_sel.refine("mgg", cut=op.in_range(100, mgg, 180))
 
         # Electrons
-        electrons = op.select(t.elec, lambda el: op.AND(op.abs(el.eta) < 3, el.pt > 10.))
+
+        electrons = op.sort(op.select(t.elec, lambda el: op.AND(
+            op.abs(el.eta) < 3, el.pt > 30)), lambda el: -el.pt)
 
         ISOelectrons = op.select(electrons, lambda el: el.isopass & (1 << 0))
 
@@ -468,8 +476,9 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             op.rng_any(IDphotons, lambda ph: op.deltaR(el.p4, ph.p4) < 0.2)))
 
         # Muons
-        muons = op.select(t.muon, lambda mu: op.AND(
-            mu.pt > 10., op.abs(mu.eta) < 2.8))
+
+        muons = op.sort(op.select(t.muon, lambda mu: op.AND(
+            op.abs(mu.eta) < 2.8, mu.pt > 30)), lambda mu: -mu.pt)
 
         ISOmuons = op.select(muons, lambda mu: mu.isopass & (1 << 0))
 
@@ -481,10 +490,10 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
 
         # taus
 
-        taus = op.select(t.tau, lambda tau: op.AND(
-            tau.pt > 20., op.abs(tau.eta) < 3))
+        taus = op.sort(op.select(t.tau, lambda tau: op.AND(
+            tau.pt > 20, op.abs(tau.eta) < 3)), lambda tau: -tau.pt)
 
-        isolatedTaus = op.select(taus, lambda tau: tau.isopass & (1 << 2)) # tight working point
+        isolatedTaus = op.select(taus, lambda tau: tau.isopass & (1 << 0))
 
         cleanedTaus = op.select(isolatedTaus, lambda tau: op.AND(
             op.NOT(op.rng_any(IDphotons,
@@ -495,89 +504,252 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
                    lambda mu: op.deltaR(tau.p4, mu.p4) < 0.2))
         ))
 
-        twoTausSel = pTmggRatio_sel.refine(
-            "twotausel", cut = op.AND(op.rng_len(cleanedTaus) >= 2, cleanedTaus[0].charge != cleanedTaus[1].charge))
-        
-        mtt = op.invariant_mass(cleanedTaus[0].p4, cleanedTaus[1].p4)
-        
-        # diTaus = op.combine(cleanedTaus, N=2, pred=lambda tau1, tau2: tau1.charge != tau2.charge)
-        
-        # diTauMass = op.invariant_mass(diTaus[0][0].p4, diTaus[0][1].p4)
-        
-        
-        
-        ZvetoSel = twoTausSel.refine("Zveto", cut = op.NOT(op.in_range(80, mtt, 100)))
+        # Higgs mass
+        mH = 125
 
-        # jets
+        # All tau pairs
+        allTauPairs = op.combine(
+            cleanedTaus, N=2, pred=lambda t1, t2: t1.charge != t2.charge)
 
-        # jets = op.select(t.jetpuppi, lambda jet: op.AND(
-        #     jet.pt > 25., op.abs(jet.eta) < 3))
+        # Best tau pair with invariant mass closest to Higgs mass
+        bestTauPair = op.rng_min_element_by(
+            allTauPairs, lambda tt: op.abs(op.invariant_mass(tt[0].p4, tt[1].p4)-mH))
 
-        # cleanedJets = op.select(jets, lambda j: op.AND(
-        #     op.NOT(op.rng_any(cleanedElectrons,
-        #            lambda el: op.deltaR(j.p4, el.p4) < 0.4)),
-        #     op.NOT(op.rng_any(cleanedMuons, lambda mu: op.deltaR(j.p4, mu.p4) < 0.4)),
-        #     op.NOT(op.rng_any(cleanedTaus, lambda tau: op.deltaR(j.p4, tau.p4) < 0.4)),
-        #     op.NOT(op.rng_any(IDphotons,
-        #            lambda ph: op.deltaR(j.p4, ph.p4) < 0.4))
-        # ))
+        # Jets
 
-        # IDJets = op.select(cleanedJets, lambda j: j.idpass & (1 << 2))
+        jets = op.sort(op.select(t.jetpuppi, lambda j: op.AND(
+            j.pt > 25, op.abs(j.eta) < 5)), lambda j: -j.pt)
 
-        # btaggedJets = op.select(
-        #     IDJets, lambda j: j.btag & (1 << 1))  # medium working point
+        cleanedJets = op.select(jets, lambda j: op.AND(
+            op.NOT(op.rng_any(cleanedElectrons,
+                   lambda el: op.deltaR(j.p4, el.p4) < 0.4)),
+            op.NOT(op.rng_any(cleanedMuons, lambda mu: op.deltaR(j.p4, mu.p4) < 0.4)),
+            op.NOT(op.rng_any(cleanedTaus, lambda tau: op.deltaR(j.p4, tau.p4) < 0.4)),
+            op.NOT(op.rng_any(IDphotons, lambda ph: op.deltaR(j.p4, ph.p4) < 0.4))
+        ))
+
+        IDJets = op.select(cleanedJets, lambda j: j.idpass &
+                           (1 << 2))  # tight working point
+
+        bJets = op.select(
+            IDJets, lambda j: j.btag & (1 << 1))  # medium working point
+
+        # missing transverse energy
+        met = op.select(t.metpuppi)
 
         # hJets = op.sum(cleanedJets[0].p4, cleanedJets[1].p4)
 
-       # plots
+        # hGG = op.sum(IDphotons[0].p4, IDphotons[1].p4)
+        # mJets= op.invariant_mass(IDJets[0].p4, IDJets[1].p4)
+        # mJets_SL= op.invariant_mass(IDJets[1].p4, IDJets[2].p4)
+        # hJets = op.sum(IDJets[0].p4, IDJets[1].p4)
 
-        plots.append(Plot.make1D("LeadingPhotonPTSel1", IDphotons[0].pt, twoPhotonsSel, EqB(
-            30, 30., 1000.), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("LeadingPhotonPTSel2", IDphotons[0].pt, pTmggRatio_sel, EqB(
-            30, 30., 1000.), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("LeadingPhotonPTSel3", IDphotons[0].pt, twoTausSel, EqB(
-            20, 30., 500.), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("LeadingPhotonPTSel4", IDphotons[0].pt, ZvetoSel, EqB(
-            20, 30., 500.), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        ## Variables for DNN ##
 
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel1", IDphotons[1].pt, twoPhotonsSel, EqB(
-            20, 20., 700.), title="Sub-Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel2", IDphotons[1].pt, pTmggRatio_sel, EqB(
-            20, 20., 700.), title="Sub-Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel3", IDphotons[1].pt, twoTausSel, EqB(
-            15, 20., 400.), title="Sub-Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("SubLeadingPhotonPTSel4", IDphotons[1].pt, ZvetoSel, EqB(
-            15, 20., 400.), title="Sub-Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        # Event level variables
+        nTaus = op.rng_len(cleanedTaus)
+        nElecs = op.rng_len(cleanedElectrons)
+        nMuons = op.rng_len(cleanedMuons)
+        nJets = op.rng_len(cleanedJets)
+        nBJets = op.rng_len(bJets)
+        #MET_pt = met.pt
 
-        plots.append(Plot.make1D("leadingTau_ptSel3", cleanedTaus[0].pt, twoTausSel, EqB(
-            20, 0., 500.), title="Leading Tau p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("leadingTau_ptSel4", cleanedTaus[0].pt, ZvetoSel, EqB(
-            20, 0., 500.), title="Leading Tau p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("SubleadingTau_ptSel3", cleanedTaus[1].pt, twoTausSel, EqB(
-            20, 0., 500.), title="Subleading Tau p_{T} [GeV]", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("SubleadingTau_ptSel4", cleanedTaus[1].pt, ZvetoSel, EqB(
-            20, 0., 500.), title="Subleading Tau p_{T} [GeV]", plotopts={"log-y": True}))
+        # Photon and di-Photon variables
+        PtMggLg = IDphotons[0].pt / mgg  # pt / mgg of the leading photon
+        PtMggSLg = IDphotons[1].pt / mgg  # pt / mgg of the sub-leading photon
+        etaLg = IDphotons[0].eta  # eta of the leading photon
+        etaSLg = IDphotons[1].eta  # eta of the sub-leading photon
+        ggPtMgg = (IDphotons[0].pt + IDphotons[1].pt) / \
+            mgg  # pt / mgg of the di-photon
+        # deltaR of the di-photon
+        ggDR = op.deltaR(IDphotons[0].p4, IDphotons[1].p4)
+        # deltaPhi of the di-photon
+        ggPhi = op.deltaPhi(IDphotons[0].p4, IDphotons[1].p4)
 
-        plots.append(Plot.make1D("MggSel1", mgg, twoPhotonsSel, EqB(
-            30, 0., 1000.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("MggSel2", mgg, pTmggRatio_sel, EqB(
-            30, 0., 1000.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("MggSel3", mgg, twoTausSel, EqB(
-            30, 100, 180.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("MggSel4", mgg, ZvetoSel, EqB(
-            30, 100, 180.), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
-        
-        plots.append(Plot.make1D("MttSel3", mtt, twoTausSel, EqB(
-            30, 0, 200.), title="M_{\tau\tau}", plotopts={"log-y": True}))
-        plots.append(Plot.make1D("MttSel4", mtt, ZvetoSel, EqB(
-            30, 0, 200.), title="M_{\tau\tau}", plotopts={"log-y": True}))
+        # Lepton, tau and jet variables
 
+        ## End of DNN variables ##
+
+        # pT_mGGL = IDphotons[0].pt/ mgg
+        # pT_mGGSL = IDphotons[1].pt/ mgg
+        # E_mGGL = IDphotons[0].p4.energy() / mgg
+        # E_mGGSL = IDphotons[1].p4.energy() / mgg
+
+        sel1_p = noSel.refine("OnePhoton", cut=op.rng_len(ISOphotons) >= 1)
+
+        sel2_p = sel1_p.refine("IDPhoton", cut=op.rng_len(IDphotons) >= 1)
+
+        sel1_e = noSel.refine("OneElec", cut=op.rng_len(ISOelectrons) >= 1)
+
+        sel2_e = sel1_e.refine("IDElec", cut=op.rng_len(IDelectrons) >= 1)
+
+        sel1_m = noSel.refine("OneMuon", cut=op.rng_len(ISOmuons) >= 1)
+
+        sel2_m = sel1_m.refine("IDMuon", cut=op.rng_len(IDmuons) >= 1)
+
+        plots.append(Plot.make1D("LeadingPhotonISO", op.map(
+            ISOphotons, lambda p: p.pt), sel1_p, EqB(30, 0, 300), title="Leading Photon pT"))
+
+        plots.append(Plot.make1D("LeadingPhotonIDISO", op.map(
+            IDphotons, lambda p: p.pt), sel2_p, EqB(30, 0, 300), title="Leading Photon pT"))
+
+        plots.append(Plot.make1D("LeadingElectronISO", ISOelectrons[0].pt, sel1_e, EqB(
+            30, 0, 300), title="Leading Electron pT"))
+
+        plots.append(Plot.make1D("LeadingElectronIDISO", IDelectrons[0].pt, sel2_e, EqB(
+            30, 0, 300), title="Leading Electron pT"))
+
+        plots.append(Plot.make1D("LeadingMuonISO", ISOmuons[0].pt, sel1_m, EqB(
+            30, 0, 300), title="Leading Muon pT"))
+
+        plots.append(Plot.make1D("LeadingMuonIDISO", IDmuons[0].pt, sel2_m, EqB(
+            30, 0, 300), title="Leading Muon pT"))
+
+        ## Categories ##
+
+        c1 = mgg_sel.refine("hasOneTauOneElec", cut=op.AND(
+            op.rng_len(cleanedTaus) == 1,
+            op.rng_len(cleanedElectrons) == 1,
+            op.rng_len(cleanedMuons) == 0,
+            cleanedTaus[0].charge != cleanedElectrons[0].charge
+        ))
+
+        c2 = mgg_sel.refine("hasOneTauOneMuon", cut=op.AND(
+            op.rng_len(cleanedTaus) == 1,
+            op.rng_len(cleanedMuons) == 1,
+            op.rng_len(cleanedElectrons) == 0,
+            cleanedTaus[0].charge != cleanedMuons[0].charge
+        ))
+
+        c3 = mgg_sel.refine("hasOneTauNoLept", cut=op.AND(
+            op.rng_len(cleanedTaus) == 1,
+            op.rng_len(cleanedElectrons) == 0,
+            op.rng_len(cleanedMuons) == 0
+        ))
+
+        c4 = mgg_sel.refine("hasTwoTaus", cut=op.AND(
+            op.rng_len(cleanedTaus) == 2,
+            op.rng_len(cleanedElectrons) == 0,
+            op.rng_len(cleanedMuons) == 0,
+            cleanedTaus[0].charge != cleanedTaus[1].charge
+        ))
+
+        ## End of Categories ##
+
+        # mggbin_list = ["hasTwoTaus"+str(i) for i in range(100, 181)]
+
+        # mggbin_dict = {}
+        # for i in range(len(mggbin_list)):
+        #     mggbin_dict[mggbin_list[i]] = mgg_sel.refine(mggbin_list[i], cut = op.in_range(mgg, i+100, i+101))
+
+        ## Z veto ##
+
+        mTauElec = op.invariant_mass(cleanedTaus[0].p4, cleanedElectrons[0].p4)
+
+        mTauMuon = op.invariant_mass(cleanedTaus[0].p4, cleanedMuons[0].p4)
+
+        mTauTau = op.invariant_mass(cleanedTaus[0].p4, cleanedTaus[1].p4)
+
+        c1_Zveto = c1.refine(
+            "hasOneTauOneElec_Zveto", cut=op.NOT(op.in_range(80, mTauElec, 100)))
+
+        c2_Zveto = c2.refine(
+            "hasOneTauOneMuon_Zveto", cut=op.NOT(op.in_range(80, mTauMuon, 100)))
+
+        c4_Zveto = c4.refine(
+            "hasTwoTaus_Zveto", cut=op.NOT(op.in_range(80, mTauTau, 100)))
+
+        ## End of Z veto ##
+
+        # plots
+
+        # Leading Photon p_T plots
+        plots.append(Plot.make1D("LeadingPhotonPTtwoPhotonsSel", IDphotons[0].pt, twoPhotonsSel, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTpTmggRatio_sel", IDphotons[0].pt, pTmggRatio_sel, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTmgg_sel", IDphotons[0].pt, mgg_sel, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc1", IDphotons[0].pt, c1, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc2", IDphotons[0].pt, c2, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc3", IDphotons[0].pt, c3, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc4", IDphotons[0].pt, c4, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc1_Zveto", IDphotons[0].pt, c1_Zveto, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc2_Zveto", IDphotons[0].pt, c2_Zveto, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("LeadingPhotonPTc4_Zveto", IDphotons[0].pt, c4_Zveto, EqB(
+            100, 30, 1000), title="Leading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+
+        # Sub-leading Photon p_T plots
+        plots.append(Plot.make1D("SubleadingPhotonPTtwoPhotonsSel", IDphotons[1].pt, twoPhotonsSel, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTpTmggRatio_sel", IDphotons[1].pt, pTmggRatio_sel, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTmgg_sel", IDphotons[1].pt, mgg_sel, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc1", IDphotons[1].pt, c1, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc2", IDphotons[1].pt, c2, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc3", IDphotons[1].pt, c3, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc4", IDphotons[1].pt, c4, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc1_Zveto", IDphotons[1].pt, c1_Zveto, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc2_Zveto", IDphotons[1].pt, c2_Zveto, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingPhotonPTc4_Zveto", IDphotons[1].pt, c4_Zveto, EqB(
+            100, 25., 1000), title="Subleading Photon p_{T} [GeV]", plotopts={"log-y": True}))
+
+        # Leading Tau p_T plots
+        plots.append(Plot.make1D("leadingTauPT_c4", bestTauPair[0].pt, c4, EqB(
+            100, 25, 500), title="Leading Tau p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("leadingTauPT_c4Zveto", bestTauPair[0].pt, c4_Zveto, EqB(
+            100, 25, 500), title="Leading Tau p_{T} [GeV]", plotopts={"log-y": True}))
+
+        # Sub-leading Tau p_T plots
+        plots.append(Plot.make1D("SubleadingTauPTc4", bestTauPair[1].pt, c4, EqB(
+            100, 25, 500), title="Sub-leading Tau p_{T} [GeV]", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("SubleadingTauPTc4_Zveto", bestTauPair[1].pt, c4_Zveto, EqB(
+            100, 25, 500), title="Subleading Tau p_{T} [GeV]", plotopts={"log-y": True}))
+
+        # di-Photon mass plots
+        plots.append(Plot.make1D("Mgg_twoPhotonsSel", mgg, twoPhotonsSel, EqB(
+            100, 0, 1000), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_pTmggRatio_sel", mgg, pTmggRatio_sel, EqB(
+            100, 0, 1000), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_mggsel", mgg, mgg_sel, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c1", mgg, c1, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c2", mgg, c2, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c3", mgg, c3, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c4", mgg, c4, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c1_Zveto", mgg, c1_Zveto, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c2_Zveto", mgg, c2_Zveto, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+        plots.append(Plot.make1D("Mgg_c4_Zveto", mgg, c4_Zveto, EqB(
+            80, 100, 180), title="M_{\gamma\gamma}", plotopts={"log-y": True}))
+
+        # Cutflow report
         cfr = CutFlowReport("yields", recursive=True, printInLog=False)
         plots.append(cfr)
+        # for mgg_bin in mggbin_dict:
+        #     cfr.add(mggbin_dict[mgg_bin], "mgg_bin")
         cfr.add(noSel, "No selection")
-        cfr.add(twoPhotonsSel, "Two Photons")
-        cfr.add(pTmggRatio_sel, "pT/mgg Ratio")
-        cfr.add(twoTausSel, "Two Taus")
-        cfr.add(ZvetoSel, "Z veto")
+        cfr.add(c1_Zveto, "One Tau One Electron")
+        cfr.add(c2_Zveto, "One Tau One Muon")
+        cfr.add(c4_Zveto, "Two Taus")
+        cfr.add(c3, "One Tau No Lept")
 
         return plots
