@@ -443,7 +443,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
             op.select(t.gamma, lambda ph: op.abs(ph.eta) < 3), lambda ph: -ph.pt)
 
         ISOphotons = op.select(photons, lambda ph: ph.isopass & (
-            1 << 2))
+            1 << 0))
 
         IDphotons = op.select(ISOphotons, lambda ph: ph.idpass & (
             1 << 2))
