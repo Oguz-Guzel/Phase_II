@@ -1,2 +1,1 @@
 root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/GluGluToHHTo2G2Qlnu_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_200PU/GluGluToHHTo2G2Qlnu_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_ntuple_0_0.root
-root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/GluGluToHHTo2G2Qlnu_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_200PU/GluGluToHHTo2G2Qlnu_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_ntuple_0_1.root
