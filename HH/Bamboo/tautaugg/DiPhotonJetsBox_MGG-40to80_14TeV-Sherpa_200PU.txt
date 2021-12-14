@@ -1,0 +1,1 @@
+root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/DiPhotonJetsBox_MGG-40to80_14TeV-Sherpa_200PU/DiPhotonJetsBox_MGG-40to80_14TeV-Sherpa_ntuple_0_0.root
