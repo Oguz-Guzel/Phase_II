@@ -1,1 +1,0 @@
-root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/W2JetsToLNu_TuneCUETP8M1_14TeV-madgraphMLM-pythia8_200PU/W2JetsToLNu_TuneCUETP8M1_14TeV-madgraphMLM-pythia8_ntuple_0_0.root
