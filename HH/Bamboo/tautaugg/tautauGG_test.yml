@@ -1,7 +1,7 @@
 tree: myana/mytree
 eras:
   HL-LHC:
-    luminosity: 3000 # 1/fb
+    luminosity: 3000 # 1/fb 
 samples:
   GluGluToHHTo2G2Tau_node_cHHH1_TuneCP5_14TeV-powheg-pythia8_200PU:
     era: HL-LHC
