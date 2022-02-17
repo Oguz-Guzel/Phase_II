@@ -925,7 +925,7 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         }
 
         # save mvaVariables to be retrieved later in the postprocessor and save in a parquet file
-        if self.args.mvaSkim or self.args.mvaEval:
+        if self.args.mvaSkim:
             from bamboo.plots import Skim
             plots.append(Skim("c4_Zveto", mvaVariables_c4_zveto, c4_Zveto))
             plots.append(Skim("c3", mvaVariables_c3, c3))
@@ -933,23 +933,79 @@ class CMSPhase2Sim(CMSPhase2SimHistoModule):
         # evaluate dnn model on data
         if self.args.mvaEval:
             #from IPython import embed
-            DNNmodel_path = "DNN_HHWWGG/model.onnx"
-            mvaVariables_c4_zveto.pop("weight", None)
+            # WW_DNNmodel_path_even = "/home/ucl/cp3/sjain/bamboodev/DNN/DNN_HHWWGG/even_model_test2.onnx"
+            # WW_DNNmodel_path_odd  = "/home/ucl/cp3/sjain/bamboodev/DNN/DNN_HHWWGG/odd_model_test2.onnx"
+            tt_DNNmodel_path_even = "/afs/cern.ch/work/a/aguzel/private/bamboodev/DNN_HHWWGG/even_model.onnx"
+            tt_DNNmodel_path_odd  = "/afs/cern.ch/work/a/aguzel/private/bamboodev/DNN_HHWWGG/odd_model.onnx"
+            # mvaVariables.pop("weight", None)
             mvaVariables_c3.pop("weight", None)
-            dnn = op.mvaEvaluator(
-                DNNmodel_path, mvaType="ONNXRuntime", otherArgs="predictions")
-            inputs = op.array(
-                'float', *[op.static_cast('float', val) for val in mvaVariables_c4_zveto.values()])
-            output = dnn(inputs)
+            from bamboo.root import loadHeader
+            loadHeader("/afs/cern.ch/work/a/aguzel/private/bamboodev/WWGGSnowMassAnalysis/header_split.h") 
 
-            plots.append(Plot.make1D(
-                "dnn_score", output, c4_Zveto, EqB(50, 0, 1.)))
-            hasDNNscore = c4_Zveto.refine("hasDNNscore", cut=output[0] > 0.58)
-            cfr.add(hasDNNscore, title='hasDNNscore')
-            plots.append(Plot.make1D("Mgg_c4Zveto_hasDNNscore", mgg, hasDNNscore, EqB(
-                80, 100., 180.), title="m_{\gamma\gamma}"))
-            plots.append(Plot.make1D("DNN_output", op.rng_len(
-                output), hasDNNscore, EqB(20, 0, 10), title="dnn_output"))
-            # embed()
+            split_evaluator = op.extMethod('split::Ph1_phi')
+            split = split_evaluator(IDphotons[0].phi)
+
+            if split == 0:
+                tt_model = tt_DNNmodel_path_even      
+                # WW_model = WW_DNNmodel_path_even      
+            else:
+                tt_model = tt_DNNmodel_path_odd
+                # WW_model = WW_DNNmodel_path_odd
+
+            # dnn_ww = op.mvaEvaluator(WW_model, mvaType = "ONNXRuntime", otherArgs = "predictions")
+            # inputs_ww = op.array('float',*[op.static_cast('float',val) for val in mvaVariables.values()])
+            # output_ww = dnn_ww(inputs_ww)
+
+            dnn_tt = op.mvaEvaluator(tt_model, mvaType = "ONNXRuntime", otherArgs = "predictions")
+            inputs_tt = op.array('float',*[op.static_cast('float',val) for val in mvaVariables_c3.values()])
+            output_tt = dnn_tt(inputs_tt)
+
+            #hasDNNscore = hasOneL.refine("hasDNNscore", cut = output[0] < 0.6)
+            # hasDNNscore = hasOneL.refine("hasDNNscore", cut = op.in_range(0.1, output_ww[0], 0.6))
+            # yields.add(hasDNNscore, title='hasDNNscore')
+            # hasDNNscore2 = hasOneL.refine("hasDNNscore2", cut = op.in_range(0.6 ,output_ww[0], 0.8))
+            # yields.add(hasDNNscore2, title='hasDNNscore2')
+            # hasDNNscore3 = hasOneL.refine("hasDNNscore3", cut = op.in_range(0.8 ,output_ww[0], 0.92))
+            # yields.add(hasDNNscore3, title='hasDNNscore3')
+            # hasDNNscore4 = hasOneL.refine("hasDNNscore4", cut = output_ww[0] > 0.92)
+            # yields.add(hasDNNscore4, title='hasDNNscore4')
+            
+
+            hasDNNscore_tt = c3.refine("hasDNNscore_tt", cut=op.in_range(0.1, output_tt[0], 0.75))
+            yields.add(hasDNNscore_tt, title='hasDNNscore_{tt}')
+            hasDNNscore2_tt = c3.refine("hasDNNscore2_tt", cut=output_tt[0] > 0.75)
+            yields.add(hasDNNscore2_tt, title='hasDNNscore2_{tt}')
+
+            # plots.append(Plot.make1D("dnn_score_ww", output_ww[0],hasOneL, EqB(50, 0, 1.)))
+            plots.append(Plot.make1D("dnn_score_tt", output_tt[0],c3, EqB(50, 0, 1.)))
+
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN"  ,mGG, hasDNNscore, EqB(80, 100.,180.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_2",mGG, hasDNNscore2, EqB(80, 100.,180.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_3",mGG, hasDNNscore3, EqB(80, 100.,180.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_4",mGG, hasDNNscore4, EqB(80, 100.,180.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_135"  ,mGG, hasDNNscore, EqB(20, 115.,135.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_2_135",mGG, hasDNNscore2, EqB(20, 115.,135.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_3_135",mGG, hasDNNscore3, EqB(20, 115.,135.), title = "m_{\gamma\gamma}"))
+            # plots.append(Plot.make1D("Inv_mass_gghasOneL_DNN_4_135",mGG, hasDNNscore4, EqB(20, 115.,135.), title = "m_{\gamma\gamma}"))
+
+            plots.append(Plot.make1D("mGG_c3_hasDNNscore", mgg, hasDNNscore_tt, EqB(80, 100., 180.), title="m_{\gamma\gamma}"))
+            plots.append(Plot.make1D("mGG_c3_hasDNNscore2", mgg, hasDNNscore2_tt, EqB(80, 100., 180.), title="m_{\gamma\gamma}"))
+            plots.append(Plot.make1D("mGG_c3_hasDNNscore_135", mgg, hasDNNscore_tt, EqB(20, 115., 135.), title="m_{\gamma\gamma}"))
+            plots.append(Plot.make1D("mGG_c3_hasDNNscore2_135", mgg, hasDNNscore2_tt, EqB(20, 115., 135.), title="m_{\gamma\gamma}"))
+
+            final_variables = {
+                "weight": noSel.weight,
+                "CMS_hgg_mass": mgg,
+            }
+
+            from bamboo.plots import Skim
+            # plots.append(Skim("oneL_C1", final_variables,hasDNNscore))   
+            # plots.append(Skim("oneL_C2", final_variables,hasDNNscore2))   
+            # plots.append(Skim("oneL_C3", final_variables,hasDNNscore3))   
+            # plots.append(Skim("oneL_C4", final_variables,hasDNNscore4))   
+            # plots.append(Skim("twoL", final_variables,hasTwoL))   
+            plots.append(Skim("oneT_C1", final_variables,hasDNNscore_tt))   
+            plots.append(Skim("oneT_C2", final_variables,hasDNNscore2_tt))   
+            plots.append(Skim("twoT", final_variables,c4_Zveto))   
 
         return plots
