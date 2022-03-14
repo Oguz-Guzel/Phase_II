@@ -1,1 +1,0 @@
-root://se01.indiacms.res.in:1094//dpm/indiacms.res.in/home/cms/store/group/Snowmass_2021_2022/DelphesNtuplizer/TTGamma_SingleLeptFromT_TuneCUETP8M2T4_14TeV-madgraph-pythia8_200PU/TTGamma_SingleLeptFromT_TuneCUETP8M2T4_14TeV-madgraph-pythia8_ntuple_0_0.root

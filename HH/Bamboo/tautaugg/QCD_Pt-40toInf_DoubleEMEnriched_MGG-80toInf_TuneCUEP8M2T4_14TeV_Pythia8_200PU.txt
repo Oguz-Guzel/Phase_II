@@ -1,1 +1,0 @@
-root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/QCD_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCUEP8M2T4_14TeV_Pythia8_200PU/QCD_Pt-40toInf_DoubleEMEnriched_MGG-80toInf_TuneCUEP8M2T4_14TeV_Pythia8_ntuple_0_1.root

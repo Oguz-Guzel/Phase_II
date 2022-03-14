@@ -1,1 +1,0 @@
-root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/ZGTo2LG_TuneCUETP8M1_14TeV-amcatnloFXFX-pythia8_200PU/ZGTo2LG_TuneCUETP8M1_14TeV-amcatnloFXFX-pythia8_ntuple_0_0.root

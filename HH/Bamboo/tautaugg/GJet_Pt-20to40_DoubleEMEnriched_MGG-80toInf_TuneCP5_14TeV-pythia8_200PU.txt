@@ -1,1 +1,0 @@
-root://cmseos.fnal.gov//store/user/snowmass/Snowmass2021/DelphesNtuplizer/GJet_Pt-20to40_DoubleEMEnriched_MGG-80toInf_TuneCP5_14TeV-pythia8_200PU/GJet_Pt-20to40_DoubleEMEnriched_MGG-80toInf_TuneCP5_14TeV-pythia8_ntuple_0_0.root
